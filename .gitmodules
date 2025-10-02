@@ -1,0 +1,18 @@
+[submodule "benchmark_projects/stylo"]
+	path = benchmark_projects/stylo
+	url = https://github.com/EcrituresNumeriques/stylo
+[submodule "benchmark_projects/anomstack"]
+	path = benchmark_projects/anomstack
+	url = https://github.com/andrewm4894/anomstack
+[submodule "benchmark_projects/Open-Locker"]
+	path = benchmark_projects/Open-Locker
+	url = https://github.com/Open-Locker/Open-Locker
+[submodule "benchmark_projects/canvas-lms"]
+	path = benchmark_projects/canvas-lms
+	url = https://github.com/instructure/canvas-lms
+[submodule "benchmark_projects/hospitalMS"]
+	path = benchmark_projects/hospitalMS
+	url = https://github.com/tauseedzaman/hospitalMS
+[submodule "benchmark_projects/react-meal-app"]
+	path = benchmark_projects/react-meal-app
+	url = git@github.com:muhammadawaisshaikh/react-meal-app.git
