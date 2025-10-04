@@ -15,9 +15,14 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
+type ExtendedContent struct {
+	Type string `json:"type"`
+	Text string `json:"text"`
+}
+
 type Message struct {
 	Role    string `json:"role"`
-	Content string `json:"content"`
+	Content any `json:"content"`
 }
 
 type OpenAIRequest struct {
@@ -99,8 +104,12 @@ func proxyHandler(w http.ResponseWriter, r *http.Request) {
 
 	log.Printf("Session %s - Incoming request with %d messages", sessionID, len(openaiReq.Messages))
 	for _, msg := range openaiReq.Messages {
+		cont, err := json.Marshal(msg)
+		if err != nil {
+			log.Fatal(err)
+		}
 		log.Printf("Session %s - User: %s", sessionID, msg.Content)
-		if err := saveMessage(sessionID, msg.Role, msg.Content, openaiReq.Model); err != nil {
+		if err := saveMessage(sessionID, msg.Role, string(cont), openaiReq.Model); err != nil {
 			log.Printf("Failed to save message: %v", err)
 		}
 	}
@@ -183,7 +192,11 @@ func streamingProxyHandler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("Session %s - Incoming request with %d messages", sessionID, len(openaiReq.Messages))
 	for _, msg := range openaiReq.Messages {
 		log.Printf("Session %s - User: %s", sessionID, msg.Content)
-		if err := saveMessage(sessionID, msg.Role, msg.Content, openaiReq.Model); err != nil {
+		cont, err := json.Marshal(msg)
+		if err != nil {
+			log.Fatal(err)
+		}
+		if err := saveMessage(sessionID, msg.Role, string(cont), openaiReq.Model); err != nil {
 			log.Printf("Failed to save message: %v", err)
 		}
 	}
@@ -279,6 +292,8 @@ func handleRequest(w http.ResponseWriter, r *http.Request) {
 
 	var openaiReq OpenAIRequest
 	if err := json.Unmarshal(body, &openaiReq); err != nil {
+		log.Println(err)
+		fmt.Println(string(body))
 		http.Error(w, "Invalid JSON request", http.StatusBadRequest)
 		return
 	}
