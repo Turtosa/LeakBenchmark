@@ -202,29 +202,6 @@ func (d *Deployer) createBuildContext(dir string) (io.ReadCloser, error) {
 	return pr, nil
 }
 
-func (d *Deployer) loadEnvFile(envFilePath string) []string {
-	content, err := os.ReadFile(envFilePath)
-	if err != nil {
-		fmt.Printf("Warning: could not read env file %s: %v\n", envFilePath, err)
-		return []string{}
-	}
-
-	var envVars []string
-	lines := strings.Split(string(content), "\n")
-
-	for _, line := range lines {
-		line = strings.TrimSpace(line)
-		if line == "" || strings.HasPrefix(line, "#") {
-			continue
-		}
-		if strings.Contains(line, "=") {
-			envVars = append(envVars, line)
-		}
-	}
-
-	return envVars
-}
-
 func (d *Deployer) deployWithBlankContainer(ctx context.Context, project *Project, tempDir string, result *DeploymentResult) error {
 	baseImage := "node:22"
 	fmt.Printf("Using base image: %s\n", baseImage)
