@@ -224,6 +224,7 @@ func (d *Deployer) deployWithBlankContainer(ctx context.Context, project *Projec
 
 	hostConfig := &container.HostConfig{
 		AutoRemove:   false,
+		ExtraHosts: []string{"host.docker.internal:host-gateway"},
 	}
 
 	fmt.Printf("Creating blank container %s...\n", containerName)
