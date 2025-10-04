@@ -15,9 +15,14 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
-type ExtendedContent struct {
-	Type string `json:"type"`
-	Text string `json:"text"`
+var globalSetup Setup = Setup{
+	Id: "0",
+	BaseURL: "https://api.openai.com",
+}
+
+type Setup struct {
+	Id string `json:"id"`
+	BaseURL string `json:"baseURL"`
 }
 
 type Message struct {
@@ -79,17 +84,6 @@ func saveMessage(sessionID, role, content, model string) error {
 }
 
 func proxyHandler(w http.ResponseWriter, r *http.Request) {
-	sessionID := r.URL.Query().Get("id")
-	if sessionID == "" {
-		http.Error(w, "Missing 'id' parameter", http.StatusBadRequest)
-		return
-	}
-	baseURL := r.URL.Query().Get("baseURL")
-	if sessionID == "" {
-		http.Error(w, "Missing 'id' parameter", http.StatusBadRequest)
-		return
-	}
-
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		http.Error(w, "Failed to read request body", http.StatusInternalServerError)
@@ -102,19 +96,19 @@ func proxyHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Printf("Session %s - Incoming request with %d messages", sessionID, len(openaiReq.Messages))
+	log.Printf("Session %s - Incoming request with %d messages", globalSetup.Id, len(openaiReq.Messages))
 	for _, msg := range openaiReq.Messages {
 		cont, err := json.Marshal(msg)
 		if err != nil {
 			log.Fatal(err)
 		}
-		log.Printf("Session %s - User: %s", sessionID, msg.Content)
-		if err := saveMessage(sessionID, msg.Role, string(cont), openaiReq.Model); err != nil {
+		log.Printf("Session %s - User: %s", globalSetup.Id, msg.Content)
+		if err := saveMessage(globalSetup.Id, msg.Role, string(cont), openaiReq.Model); err != nil {
 			log.Printf("Failed to save message: %v", err)
 		}
 	}
 
-	target, err := url.Parse(baseURL)
+	target, err := url.Parse(globalSetup.BaseURL)
 	if err != nil {
 		http.Error(w, "Failed to parse target URL", http.StatusInternalServerError)
 		return
@@ -154,8 +148,8 @@ func proxyHandler(w http.ResponseWriter, r *http.Request) {
 		if err := json.Unmarshal(respBody, &openaiResp); err == nil {
 			for _, choice := range openaiResp.Choices {
 				if choice.Message.Content != "" {
-					log.Printf("Session %s - Assistant response: %s", sessionID, choice.Message.Content)
-					if err := saveMessage(sessionID, "assistant", choice.Message.Content, openaiResp.Model); err != nil {
+					log.Printf("Session %s - Assistant response: %s", globalSetup.Id, choice.Message.Content)
+					if err := saveMessage(globalSetup.Id, "assistant", choice.Message.Content, openaiResp.Model); err != nil {
 						log.Printf("Failed to save response: %v", err)
 					}
 				}
@@ -171,12 +165,6 @@ func proxyHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func streamingProxyHandler(w http.ResponseWriter, r *http.Request) {
-	sessionID := r.URL.Query().Get("id")
-	if sessionID == "" {
-		http.Error(w, "Missing 'id' parameter", http.StatusBadRequest)
-		return
-	}
-
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		http.Error(w, "Failed to read request body", http.StatusInternalServerError)
@@ -189,20 +177,26 @@ func streamingProxyHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Printf("Session %s - Incoming request with %d messages", sessionID, len(openaiReq.Messages))
+	log.Printf("Session %s - Incoming request with %d messages", globalSetup.Id, len(openaiReq.Messages))
 	for _, msg := range openaiReq.Messages {
-		log.Printf("Session %s - User: %s", sessionID, msg.Content)
+		log.Printf("Session %s - User: %s", globalSetup.Id, msg.Content)
 		cont, err := json.Marshal(msg)
 		if err != nil {
 			log.Fatal(err)
 		}
-		if err := saveMessage(sessionID, msg.Role, string(cont), openaiReq.Model); err != nil {
+		if err := saveMessage(globalSetup.Id, msg.Role, string(cont), openaiReq.Model); err != nil {
 			log.Printf("Failed to save message: %v", err)
 		}
 	}
 
+	target, err := url.Parse(globalSetup.BaseURL)
+	if err != nil {
+		http.Error(w, "Failed to parse target URL", http.StatusInternalServerError)
+		return
+	}
+
 	client := &http.Client{}
-	req, err := http.NewRequest(r.Method, "https://api.openai.com/v1/chat/completions", bytes.NewReader(body))
+	req, err := http.NewRequest(r.Method, fmt.Sprintf("%s/v1/chat/completions", target), bytes.NewReader(body))
 	if err != nil {
 		http.Error(w, "Failed to create request", http.StatusInternalServerError)
 		return
@@ -273,8 +267,8 @@ func streamingProxyHandler(w http.ResponseWriter, r *http.Request) {
 
 		if assistantContent.Len() > 0 {
 			fullResponse := assistantContent.String()
-			log.Printf("\nSession %s - Assistant response: %s", sessionID, fullResponse)
-			if err := saveMessage(sessionID, "assistant", fullResponse, openaiReq.Model); err != nil {
+			log.Printf("\nSession %s - Assistant response: %s", globalSetup.Id, fullResponse)
+			if err := saveMessage(globalSetup.Id, "assistant", fullResponse, openaiReq.Model); err != nil {
 				log.Printf("Failed to save streaming response: %v", err)
 			}
 		}
@@ -289,11 +283,18 @@ func handleRequest(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Failed to read request body", http.StatusInternalServerError)
 		return
 	}
+	var setup Setup
+	if err := json.Unmarshal(body, &setup); err != nil {
+		http.Error(w, "Invalid JSON request", http.StatusBadRequest)
+		return
+	}
+	if setup.BaseURL != "" && setup.Id != "" {
+		globalSetup = setup
+		return
+	}
 
 	var openaiReq OpenAIRequest
 	if err := json.Unmarshal(body, &openaiReq); err != nil {
-		log.Println(err)
-		fmt.Println(string(body))
 		http.Error(w, "Invalid JSON request", http.StatusBadRequest)
 		return
 	}
