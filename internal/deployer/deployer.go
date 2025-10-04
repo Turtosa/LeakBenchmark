@@ -226,7 +226,7 @@ func (d *Deployer) loadEnvFile(envFilePath string) []string {
 }
 
 func (d *Deployer) deployWithBlankContainer(ctx context.Context, project *Project, tempDir string, result *DeploymentResult) error {
-	baseImage := "ubuntu:22.04"
+	baseImage := "node:22"
 	fmt.Printf("Using base image: %s\n", baseImage)
 
 	fmt.Printf("Pulling base image %s...\n", baseImage)
