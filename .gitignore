@@ -1,4 +1,5 @@
 openai_proxy/test.sh
+./secrets.json
 openai_proxy/messages.db
 openai_proxy/openai_proxy
 ./deployer
