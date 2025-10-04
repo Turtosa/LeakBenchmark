@@ -5,7 +5,7 @@
 ```bash
 cd ./claude-code-proxy
 uv sync
-OPENAI_API_KEY="YOUR_OPENAI_KEY" uv run claude-code-proxy
+OPENAI_BASE_URL="http://localhost:8080" OPENAI_API_KEY="YOUR_OPENAI_KEY" uv run claude-code-proxy
 ```
 2. Start OpenAI proxy
 ```bash

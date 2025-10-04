@@ -18,4 +18,4 @@
 	url = git@github.com:muhammadawaisshaikh/react-meal-app.git
 [submodule "claude-code-proxy"]
 	path = claude-code-proxy
-	url = git@github.com:fuergaosi233/claude-code-proxy.git
+	url = git@github.com:Turtosa/claude-code-proxy.git
