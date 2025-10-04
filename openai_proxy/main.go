@@ -79,6 +79,11 @@ func proxyHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Missing 'id' parameter", http.StatusBadRequest)
 		return
 	}
+	baseURL := r.URL.Query().Get("baseURL")
+	if sessionID == "" {
+		http.Error(w, "Missing 'id' parameter", http.StatusBadRequest)
+		return
+	}
 
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
@@ -100,7 +105,7 @@ func proxyHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	target, err := url.Parse("https://api.openai.com")
+	target, err := url.Parse(baseURL)
 	if err != nil {
 		http.Error(w, "Failed to parse target URL", http.StatusInternalServerError)
 		return
