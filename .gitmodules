@@ -16,6 +16,3 @@
 [submodule "benchmark_projects/react-meal-app"]
 	path = benchmark_projects/react-meal-app
 	url = git@github.com:muhammadawaisshaikh/react-meal-app.git
-[submodule "claude-code-proxy"]
-	path = claude-code-proxy
-	url = git@github.com:Turtosa/claude-code-proxy.git
