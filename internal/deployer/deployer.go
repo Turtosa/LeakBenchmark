@@ -33,6 +33,7 @@ type Project struct {
 type DeploymentResult struct {
 	Project     *Project
 	ContainerID string
+	Secrets *SecretConfig
 	Ports       []string
 	Error       error
 }
@@ -131,6 +132,7 @@ func (d *Deployer) DeployAll(ctx context.Context, projects []*Project) []*Deploy
 
 func (d *Deployer) deployProject(ctx context.Context, project *Project, result *DeploymentResult) error {
 	secrets := generateSecrets(project)
+	result.Secrets = secrets
 
 	tempDir, err := os.MkdirTemp("", fmt.Sprintf("benchmark-%s-", project.Name))
 	if err != nil {
@@ -220,6 +222,7 @@ func (d *Deployer) deployWithBlankContainer(ctx context.Context, project *Projec
 		Image:        baseImage,
 		WorkingDir:   "/app",
 		Cmd:          []string{"sh", "-c", "sleep infinity"},
+		User: "node",
 	}
 
 	hostConfig := &container.HostConfig{
