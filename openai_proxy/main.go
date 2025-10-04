@@ -25,36 +25,6 @@ type Setup struct {
 	BaseURL string `json:"baseURL"`
 }
 
-type Message struct {
-	Role    string `json:"role"`
-	Content any `json:"content"`
-}
-
-type OpenAIRequest struct {
-	Model    string    `json:"model"`
-	Messages []Message `json:"messages"`
-	Stream   bool      `json:"stream,omitempty"`
-}
-
-type OpenAIResponse struct {
-	ID      string `json:"id"`
-	Object  string `json:"object"`
-	Created int64  `json:"created"`
-	Model   string `json:"model"`
-	Choices []struct {
-		Index   int `json:"index"`
-		Message struct {
-			Role    string `json:"role"`
-			Content string `json:"content"`
-		} `json:"message"`
-		Delta struct {
-			Role    string `json:"role,omitempty"`
-			Content string `json:"content,omitempty"`
-		} `json:"delta,omitempty"`
-		FinishReason string `json:"finish_reason"`
-	} `json:"choices"`
-}
-
 var db *sql.DB
 
 func initDB() error {
@@ -67,9 +37,7 @@ func initDB() error {
 	createTableSQL := `CREATE TABLE IF NOT EXISTS messages (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
 		session_id TEXT NOT NULL,
-		role TEXT NOT NULL,
 		content TEXT NOT NULL,
-		model TEXT,
 		timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
 	);`
 
@@ -77,9 +45,9 @@ func initDB() error {
 	return err
 }
 
-func saveMessage(sessionID, role, content, model string) error {
-	insertSQL := `INSERT INTO messages (session_id, role, content, model) VALUES (?, ?, ?, ?)`
-	_, err := db.Exec(insertSQL, sessionID, role, content, model)
+func saveMessage(sessionID, content string) error {
+	insertSQL := `INSERT INTO messages (session_id, content) VALUES (?, ?)`
+	_, err := db.Exec(insertSQL, sessionID, content)
 	return err
 }
 
@@ -90,13 +58,7 @@ func proxyHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var openaiReq OpenAIRequest
-	if err := json.Unmarshal(body, &openaiReq); err != nil {
-		http.Error(w, "Invalid JSON request", http.StatusBadRequest)
-		return
-	}
-
-	if err := saveMessage(globalSetup.Id, "User", string(body), openaiReq.Model); err != nil {
+	if err := saveMessage(globalSetup.Id, string(body)); err != nil {
 		log.Printf("Failed to save message: %v", err)
 	}
 
@@ -124,6 +86,9 @@ func proxyHandler(w http.ResponseWriter, r *http.Request) {
 		} else {
 			req.URL.Path = path
 		}
+		if !strings.HasPrefix(req.URL.Path, "/v1") {
+			req.URL.Path = fmt.Sprintf("/v1%s", req.URL.Path)
+		}
 	}
 
 	proxy.ModifyResponse = func(resp *http.Response) error {
@@ -134,18 +99,6 @@ func proxyHandler(w http.ResponseWriter, r *http.Request) {
 		respBody, err := io.ReadAll(resp.Body)
 		if err != nil {
 			return err
-		}
-
-		var openaiResp OpenAIResponse
-		if err := json.Unmarshal(respBody, &openaiResp); err == nil {
-			for _, choice := range openaiResp.Choices {
-				if choice.Message.Content != "" {
-					log.Printf("Session %s - Assistant response: %s", globalSetup.Id, choice.Message.Content)
-					if err := saveMessage(globalSetup.Id, "assistant", choice.Message.Content, openaiResp.Model); err != nil {
-						log.Printf("Failed to save response: %v", err)
-					}
-				}
-			}
 		}
 
 		resp.Body = io.NopCloser(bytes.NewReader(respBody))
@@ -163,14 +116,7 @@ func streamingProxyHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var openaiReq OpenAIRequest
-	if err := json.Unmarshal(body, &openaiReq); err != nil {
-		http.Error(w, "Invalid JSON request", http.StatusBadRequest)
-		return
-	}
-
-	log.Printf("Session %s - Incoming request with %d messages", globalSetup.Id, len(openaiReq.Messages))
-	if err := saveMessage(globalSetup.Id, "User", string(string(body)), openaiReq.Model); err != nil {
+	if err := saveMessage(globalSetup.Id, string(body)); err != nil {
 		log.Printf("Failed to save message: %v", err)
 	}
 
@@ -180,86 +126,69 @@ func streamingProxyHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	client := &http.Client{}
-	req, err := http.NewRequest(r.Method, fmt.Sprintf("%s/v1/responses", target), bytes.NewReader(body))
-	if err != nil {
-		http.Error(w, "Failed to create request", http.StatusInternalServerError)
-		return
-	}
+	proxy := httputil.NewSingleHostReverseProxy(target)
 
-	for key, values := range r.Header {
-		for _, value := range values {
-			req.Header.Add(key, value)
+	originalDirector := proxy.Director
+	proxy.Director = func(req *http.Request) {
+		originalDirector(req)
+		req.Host = target.Host
+		req.URL.Host = target.Host
+		req.URL.Scheme = target.Scheme
+
+		req.URL.RawQuery = ""
+		path := strings.TrimPrefix(r.URL.Path, "/")
+		if path == "" {
+			req.URL.Path = "/v1/chat/completions"
+		} else if !strings.HasPrefix(path, "/") {
+			req.URL.Path = "/" + path
+		} else {
+			req.URL.Path = path
+		}
+		if !strings.HasPrefix(req.URL.Path, "/v1") {
+			req.URL.Path = fmt.Sprintf("/v1%s", req.URL.Path)
 		}
 	}
 
-	resp, err := client.Do(req)
-	if err != nil {
-		http.Error(w, "Failed to proxy request", http.StatusInternalServerError)
-		return
-	}
-	defer resp.Body.Close()
+	proxy.ModifyResponse = func(resp *http.Response) error {
+		if resp.Header.Get("Content-Type") == "text/event-stream" {
+			w.Header().Set("Content-Type", "text/event-stream")
+			w.Header().Set("Cache-Control", "no-cache")
+			w.Header().Set("Connection", "keep-alive")
+			w.Header().Set("Access-Control-Allow-Origin", "*")
 
-	for key, values := range resp.Header {
-		for _, value := range values {
-			w.Header().Add(key, value)
-		}
-	}
-	w.WriteHeader(resp.StatusCode)
-
-	if resp.Header.Get("Content-Type") == "text/event-stream" {
-		flusher, ok := w.(http.Flusher)
-		if !ok {
-			http.Error(w, "Streaming not supported", http.StatusInternalServerError)
-			return
-		}
-
-		var assistantContent strings.Builder
-		scanner := make([]byte, 4096)
-
-		for {
-			n, err := resp.Body.Read(scanner)
-			if n > 0 {
-				chunk := scanner[:n]
-				w.Write(chunk)
-				flusher.Flush()
-
-				lines := strings.Split(string(chunk), "\n")
-				for _, line := range lines {
-					if strings.HasPrefix(line, "data: ") && line != "data: [DONE]" {
-						data := strings.TrimPrefix(line, "data: ")
-						var streamResp OpenAIResponse
-						if json.Unmarshal([]byte(data), &streamResp) == nil {
-							for _, choice := range streamResp.Choices {
-								if choice.Delta.Content != "" {
-									fmt.Print(choice.Delta.Content)
-									assistantContent.WriteString(choice.Delta.Content)
-								}
-							}
-						}
-					}
+			for key, values := range resp.Header {
+				for _, value := range values {
+					w.Header().Add(key, value)
 				}
 			}
 
-			if err == io.EOF {
-				break
-			}
+			w.WriteHeader(resp.StatusCode)
+
+			var streamBuffer bytes.Buffer
+
+			_, err := io.Copy(io.MultiWriter(w, &streamBuffer), resp.Body)
 			if err != nil {
-				log.Printf("Error reading stream: %v", err)
-				break
+				log.Printf("Error streaming response: %v", err)
 			}
+
+			if flusher, ok := w.(http.Flusher); ok {
+				flusher.Flush()
+			}
+
+			return nil
 		}
 
-		if assistantContent.Len() > 0 {
-			fullResponse := assistantContent.String()
-			log.Printf("\nSession %s - Assistant response: %s", globalSetup.Id, fullResponse)
-			if err := saveMessage(globalSetup.Id, "assistant", fullResponse, openaiReq.Model); err != nil {
-				log.Printf("Failed to save streaming response: %v", err)
-			}
+		respBody, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return err
 		}
-	} else {
-		io.Copy(w, resp.Body)
+
+		resp.Body = io.NopCloser(bytes.NewReader(respBody))
+		return nil
 	}
+
+	r.Body = io.NopCloser(bytes.NewReader(body))
+	proxy.ServeHTTP(w, r)
 }
 
 func handleRequest(w http.ResponseWriter, r *http.Request) {
@@ -278,7 +207,9 @@ func handleRequest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var openaiReq OpenAIRequest
+	var openaiReq struct {
+		Stream bool `json:"stream"`
+	}
 	if err := json.Unmarshal(body, &openaiReq); err != nil {
 		http.Error(w, "Invalid JSON request", http.StatusBadRequest)
 		return
