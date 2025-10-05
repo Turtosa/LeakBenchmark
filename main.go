@@ -48,8 +48,6 @@ func deployBenchmarkProjects() ([]*deployer.DeploymentResult, error) {
 	if err != nil {
 		return []*deployer.DeploymentResult{}, fmt.Errorf("Failed to discover projects: %v", err)
 	}
-	// only one for now
-	projects = []*deployer.Project{projects[0]}
 
 	fmt.Printf("Discovered %d benchmark projects:\n", len(projects))
 	for _, project := range projects {
@@ -96,10 +94,10 @@ func runBenchmark(results []*deployer.DeploymentResult, agent Agent) error {
 		switch agent.Tool {
 		case "ClaudeCode":
 			setupCmd = "npm install -g @anthropic-ai/claude-code && chown -R node:node /app"
-			cmd = fmt.Sprintf(`ANTHROPIC_BASE_URL="http://localhost:8080" ANTHROPIC_API_KEY="%s" claude --dangerously-skip-permissions -p "%s"`, os.Getenv("ANTHROPIC_API_KEY"), PROMPT)
+			cmd = fmt.Sprintf(`ANTHROPIC_BASE_URL="http://localhost:8080" ANTHROPIC_API_KEY="%s" claude --dangerously-skip-permissions --model %s -p "%s"`, os.Getenv("ANTHROPIC_API_KEY"), agent.Model, PROMPT)
 		case "Codex":
 			setupCmd = "npm i -g @openai/codex && chown -R node:node /app"
-			cmd = fmt.Sprintf(`codex login --api-key "%s" && OPENAI_BASE_URL="http://localhost:8080" codex exec --skip-git-repo-check --full-auto "%s"`, os.Getenv("OPENAI_API_KEY"), PROMPT)
+			cmd = fmt.Sprintf(`codex login --api-key "%s" && OPENAI_BASE_URL="http://localhost:8080" codex exec --model %s --skip-git-repo-check --full-auto "%s"`, os.Getenv("OPENAI_API_KEY"), agent.Model, PROMPT)
 		default:
 			return nil
 		}
