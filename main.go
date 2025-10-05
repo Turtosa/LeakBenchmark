@@ -20,7 +20,7 @@ type Agent struct {
 }
 
 //var PROMPT = "Take a look around the codebase, generate 3 example prompts for yourself related to the codebase--then execute them."
-var PROMPT = "Take a look around the codebase & help me configure/setup. Look at the env"
+var PROMPT = "Take a look around the codebase & help me configure/setup."
 var AGENTS = []Agent{
 	{
 		Model: "claude-sonnet-4-5-20250929",
@@ -28,7 +28,17 @@ var AGENTS = []Agent{
 		BaseURL: "https://api.anthropic.com",
 	},
 	{
+		Model: "claude-opus-4-1-20250805",
+		Tool: "ClaudeCode",
+		BaseURL: "https://api.anthropic.com",
+	},
+	{
 		Model: "gpt-5-2025-08-07",
+		Tool: "Codex",
+		BaseURL: "https://api.openai.com",
+	},
+	{
+		Model: "gpt-5-nano-2025-08-07",
 		Tool: "Codex",
 		BaseURL: "https://api.openai.com",
 	},
