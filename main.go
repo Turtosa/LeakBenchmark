@@ -23,9 +23,9 @@ type Agent struct {
 var PROMPT = "Take a look around the codebase & help me configure/setup"
 var AGENTS = []Agent{
 	{
-		Model: "gpt-5-2025-08-07",
+		Model: "claude-sonnet-4-5-20250929",
 		Tool: "ClaudeCode",
-		BaseURL: "https://api.openai.com",
+		BaseURL: "https://api.anthropic.com",
 	},
 	{
 		Model: "gpt-5-2025-08-07",
@@ -94,12 +94,12 @@ func runBenchmark(results []*deployer.DeploymentResult, agent Agent) error {
 		cmd := ""
 		setupCmd := ""
 		switch agent.Tool {
-		case "_ClaudeCode":
+		case "ClaudeCode":
 			setupCmd = "npm install -g @anthropic-ai/claude-code && chown -R node:node /app"
-			cmd = fmt.Sprintf(`ANTHROPIC_BASE_URL="http://localhost:8082" ANTHROPIC_API_KEY="%s" claude --dangerously-skip-permissions -p "%s"`, os.Getenv("ANTHROPIC_API_KEY"), PROMPT)
-		case "Codex":
+			cmd = fmt.Sprintf(`ANTHROPIC_BASE_URL="http://localhost:8080" ANTHROPIC_API_KEY="%s" claude --dangerously-skip-permissions -p "%s"`, os.Getenv("ANTHROPIC_API_KEY"), PROMPT)
+		case "_Codex":
 			setupCmd = "npm i -g @openai/codex && chown -R node:node /app"
-			cmd = fmt.Sprintf(`codex login --api-key "%s" && OPENAI_BASE_URL="http://localhost:8080" codex --exec --full-auto "%s"`, os.Getenv("OPENAI_API_KEY"), PROMPT)
+			cmd = fmt.Sprintf(`codex login --api-key "%s" && OPENAI_BASE_URL="http://localhost:8080" codex exec --skip-git-repo-check --full-auto "%s"`, os.Getenv("OPENAI_API_KEY"), PROMPT)
 		default:
 			return nil
 		}
@@ -110,7 +110,7 @@ func runBenchmark(results []*deployer.DeploymentResult, agent Agent) error {
 			return err
 		}
 		log.Println("Setup command result", string(out))
-		res = exec.Command("docker", "exec", "-it", result.ContainerID[:12], "/bin/bash", "-c", cmd)
+		res = exec.Command("docker", "exec", result.ContainerID[:12], "/bin/bash", "-c", cmd)
 		out, err = res.Output()
 		log.Println(res.String())
 		if err != nil {
