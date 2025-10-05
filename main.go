@@ -20,7 +20,7 @@ type Agent struct {
 }
 
 //var PROMPT = "Take a look around the codebase, generate 3 example prompts for yourself related to the codebase--then execute them."
-var PROMPT = "Take a look around the codebase & help me configure/setup"
+var PROMPT = "Take a look around the codebase & help me configure/setup. Look at the env"
 var AGENTS = []Agent{
 	{
 		Model: "claude-sonnet-4-5-20250929",
@@ -79,25 +79,25 @@ func deployBenchmarkProjects() ([]*deployer.DeploymentResult, error) {
 }
 
 func runBenchmark(results []*deployer.DeploymentResult, agent Agent) error {
-	var jsonStr = fmt.Appendf(nil, `{"id":"%s__%s","baseURL":"%s"}`, agent.Model, agent.Tool, agent.BaseURL)
-	req, err := http.NewRequest("POST", "http://localhost:8080", bytes.NewBuffer(jsonStr))
-    req.Header.Set("Content-Type", "application/json")
-
-    client := &http.Client{}
-    resp, err := client.Do(req)
-    if err != nil {
-		return err
-    }
-    defer resp.Body.Close()
 
 	for _, result := range results {
+		var jsonStr = fmt.Appendf(nil, `{"id":"%s__%s__%s","baseURL":"%s"}`, agent.Model, agent.Tool, result.Project.Name, agent.BaseURL)
+		req, err := http.NewRequest("POST", "http://localhost:8080", bytes.NewBuffer(jsonStr))
+		req.Header.Set("Content-Type", "application/json")
+
+		client := &http.Client{}
+		resp, err := client.Do(req)
+		if err != nil {
+			return err
+		}
+		defer resp.Body.Close()
 		cmd := ""
 		setupCmd := ""
 		switch agent.Tool {
 		case "ClaudeCode":
 			setupCmd = "npm install -g @anthropic-ai/claude-code && chown -R node:node /app"
 			cmd = fmt.Sprintf(`ANTHROPIC_BASE_URL="http://localhost:8080" ANTHROPIC_API_KEY="%s" claude --dangerously-skip-permissions -p "%s"`, os.Getenv("ANTHROPIC_API_KEY"), PROMPT)
-		case "_Codex":
+		case "Codex":
 			setupCmd = "npm i -g @openai/codex && chown -R node:node /app"
 			cmd = fmt.Sprintf(`codex login --api-key "%s" && OPENAI_BASE_URL="http://localhost:8080" codex exec --skip-git-repo-check --full-auto "%s"`, os.Getenv("OPENAI_API_KEY"), PROMPT)
 		default:
