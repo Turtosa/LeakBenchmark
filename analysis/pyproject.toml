@@ -1,0 +1,10 @@
+[project]
+name = "leak-analysis"
+version = "0.1.0"
+description = "Analysis of secret leakage in messages database"
+requires-python = ">=3.8"
+dependencies = [
+    "matplotlib>=3.5.0",
+    "pandas>=1.5.0",
+    "seaborn>=0.11.0",
+]
