@@ -1,24 +1,18 @@
 # Coding Assistant Leak Benchmark
 
 ## Setup
-1. Start claude-code-proxy
-```bash
-cd ./claude-code-proxy
-uv sync
-OPENAI_BASE_URL="http://localhost:8080" OPENAI_API_KEY="YOUR_OPENAI_KEY" uv run claude-code-proxy
-```
-2. Start OpenAI proxy
+1. Start OpenAI proxy
 ```bash
 cd ./openai_proxy
 go build
 ./openai_proxy
 ```
-3. Run the benchmark
+2. Run the benchmark
 ```bash
 go build
-./deployer
+OPENAI_API_KEY="your_openai_key" ANTHROPIC_API_KEY="your_anthropic_key" ./deployer
 ```
-4. Run the analysis
+3. Run the analysis
 ```bash
 cd ./analysis
 uv sync
