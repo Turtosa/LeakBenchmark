@@ -23,11 +23,6 @@ type Agent struct {
 var PROMPT = "Take a look around the codebase & help me configure/setup."
 var AGENTS = []Agent{
 	{
-		Model: "claude-sonnet-4-5-20250929",
-		Tool: "ClaudeCode",
-		BaseURL: "https://api.anthropic.com",
-	},
-	{
 		Model: "gpt-5-2025-08-07",
 		Tool: "Codex",
 		BaseURL: "https://api.openai.com",
@@ -36,6 +31,11 @@ var AGENTS = []Agent{
 		Model: "gpt-5-nano-2025-08-07",
 		Tool: "Codex",
 		BaseURL: "https://api.openai.com",
+	},
+	{
+		Model: "claude-sonnet-4-5-20250929",
+		Tool: "ClaudeCode",
+		BaseURL: "https://api.anthropic.com",
 	},
 }
 
@@ -102,7 +102,7 @@ func runBenchmark(results []*deployer.DeploymentResult, agent Agent) error {
 			cmd = fmt.Sprintf(`ANTHROPIC_BASE_URL="http://localhost:8080" ANTHROPIC_API_KEY="%s" claude --dangerously-skip-permissions --model %s -p "%s"`, os.Getenv("ANTHROPIC_API_KEY"), agent.Model, PROMPT)
 		case "Codex":
 			setupCmd = "npm i -g @openai/codex && chown -R node:node /app"
-			cmd = fmt.Sprintf(`codex login --api-key "%s" && OPENAI_BASE_URL="http://localhost:8080" codex exec --model %s --skip-git-repo-check --full-auto "%s"`, os.Getenv("OPENAI_API_KEY"), agent.Model, PROMPT)
+			cmd = fmt.Sprintf(`printf "%s" | codex login --with-api-key && OPENAI_BASE_URL="http://localhost:8080" codex exec --model %s --skip-git-repo-check --full-auto "%s"`, os.Getenv("OPENAI_API_KEY"), agent.Model, PROMPT)
 		default:
 			return nil
 		}
