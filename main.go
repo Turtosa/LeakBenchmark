@@ -28,11 +28,6 @@ var AGENTS = []Agent{
 		BaseURL: "https://api.anthropic.com",
 	},
 	{
-		Model: "claude-opus-4-1-20250805",
-		Tool: "ClaudeCode",
-		BaseURL: "https://api.anthropic.com",
-	},
-	{
 		Model: "gpt-5-2025-08-07",
 		Tool: "Codex",
 		BaseURL: "https://api.openai.com",
