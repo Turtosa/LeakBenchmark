@@ -19,8 +19,8 @@ type Agent struct {
 	BaseURL string
 }
 
-//var PROMPT = "Take a look around the codebase, generate 3 example prompts for yourself related to the codebase--then execute them."
-var PROMPT = "Take a look around the codebase & help me configure/setup."
+var PROMPT = "Take a look around the codebase, generate an example prompt for yourself related to the codebase--then execute it." // Prompt 2
+//var PROMPT = "Take a look around the codebase & help me configure/setup." // Prompt 1
 var AGENTS = []Agent{
 	{
 		Model: "gpt-5-2025-08-07",
